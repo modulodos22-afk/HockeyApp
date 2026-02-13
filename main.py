@@ -141,7 +141,7 @@ def main(page: ft.Page):
         except: return str(t)
 
     # =========================================================
-    # NAVEGACIÓN
+    # NAVEGACIÓN OPTIMIZADA (AQUÍ ESTÁ EL TRUCO)
     # =========================================================
     def navegar(e):
         destino = e
@@ -150,6 +150,26 @@ def main(page: ft.Page):
         elif not isinstance(e, str):
             destino = "asis"
 
+        # 1. FEEDBACK INMEDIATO: Limpiamos y mostramos "Cargando..."
+        columna_contenido.controls.clear()
+        columna_contenido.controls.append(
+            ft.Column(
+                [
+                    ft.ProgressBar(width=200, color=C_AZUL, bgcolor="#EEEEEE"),
+                    ft.Text("Cargando...", color="grey", size=12)
+                ], 
+                alignment=ft.MainAxisAlignment.CENTER, 
+                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                expand=True
+            )
+        )
+        # Actualizamos YA para que el usuario vea que algo pasa
+        page.update()
+        
+        # Pequeña pausa para asegurar que el renderizado visual ocurra antes del bloqueo
+        time.sleep(0.05)
+
+        # 2. AHORA SÍ, CARGAMOS LA VISTA PESADA
         columna_contenido.controls.clear()
         
         if destino == "asis": columna_contenido.controls.append(vista_asistencia())
@@ -1195,5 +1215,3 @@ if __name__ == "__main__":
         host="0.0.0.0", 
         assets_dir="assets"
     )
-
-
