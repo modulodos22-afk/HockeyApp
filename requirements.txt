@@ -1,0 +1,4 @@
+flet
+gspread==5.10.0
+oauth2client
+fpdf2
