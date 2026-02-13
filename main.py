@@ -905,7 +905,7 @@ def main(page: ft.Page):
         items = []
         for j in lista_jugadoras_raw:
             btn = ft.ElevatedButton("✏️", bgcolor=C_BLANCO, color=C_AZUL, width=50, on_click=lambda e, x=j: form(x))
-            items.append(ft.Container(content=ft.Row([ft.Text("👤", size=20), ft.Column([ft.Text(f"{j['nombre']} {j['apellido']}", weight="bold"), ft.Text(f"Camiseta: {j.get('camiseta','-')}", size=12, color="grey")], expand=True), btn]), padding=10, border=ft.Border.all(1, "#EEE"))))
+            items.append(ft.Container(content=ft.Row([ft.Text("👤", size=20), ft.Column([ft.Text(f"{j['nombre']} {j['apellido']}", weight="bold"), ft.Text(f"Camiseta: {j.get('camiseta','-')}", size=12, color="grey")], expand=True), btn]), padding=10, border=ft.Border.all(1, "#EEE")))
         return ft.Column([ft.Row([ft.Text("Mi Plantel", size=20, weight="bold"), ft.ElevatedButton("+ ALTA", on_click=lambda e:form(None), bgcolor=C_AZUL, color="white")], alignment="spaceBetween"), ft.Column(items, spacing=5)])
 
     def vista_reporte_completo():
@@ -1196,4 +1196,5 @@ if __name__ == "__main__":
         host="0.0.0.0", 
         assets_dir="assets"
     )
+
 
