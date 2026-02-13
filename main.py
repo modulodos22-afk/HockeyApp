@@ -6,7 +6,6 @@ import os
 import calendar
 import re
 import platform
-import subprocess
 import base64
 import time
 import tracemalloc
@@ -46,6 +45,7 @@ def conectar_google_sheets():
 def main(page: ft.Page):
     # --- CONFIGURACIÓN DE ASSETS ---
     page.assets_dir = "assets"
+    # Aseguramos que la carpeta exista (por si el truco de git falla)
     if not os.path.exists("assets"):
         os.makedirs("assets")
 
@@ -165,80 +165,56 @@ def main(page: ft.Page):
         page.update()
 
     # =========================================================
-    # PDF FORMACIÓN (DISEÑO VIEJO + SISTEMA NUEVO)
+    # PDF FORMACIÓN
     # =========================================================
     def generar_pdf_formacion(partido_str, esquema_str, titulares_dict, ausentes_list, suplentes_list, categoria):
         if not TIENE_PDF: return False, "Falta fpdf", None
         try:
-            # --- LÓGICA DE DIBUJO DEL CÓDIGO VIEJO ---
             pdf = FPDF('L', 'mm', 'A4')
             pdf.set_auto_page_break(auto=False)
             pdf.add_page()
             
-            # BARRA SUPERIOR GRIS CON LETRAS BLANCAS
-            pdf.set_fill_color(80, 80, 80) # Gris oscuro profesional
+            # BARRA SUPERIOR
+            pdf.set_fill_color(80, 80, 80)
             pdf.rect(0, 0, 297, 18, 'F')
             pdf.set_font("Arial", 'B', 14); pdf.set_text_color(255, 255, 255)
             pdf.set_xy(0, 5)
             header_txt = f"{categoria.upper()} | {partido_str.upper()}"
             pdf.cell(297, 8, clean_latin(header_txt), align='C')
             
-            # PIE DE PÁGINA: FECHA DE GENERACIÓN
+            # PIE DE PÁGINA
             pdf.set_y(-12)
             pdf.set_font("Arial", 'I', 8); pdf.set_text_color(150)
             pdf.cell(0, 10, f"Planilla generada el: {datetime.now().strftime('%d/%m/%Y %H:%M')}", 0, 0, 'R')
 
-            # DIBUJO CANCHA SINTÉTICA
+            # CANCHA
             x_c, y_c, w_c, h_c = 15, 30, 267, 130 
-            
-            # Bancos de Suplentes
-            pdf.set_fill_color(255, 152, 0); pdf.rect(x_c + (w_c * 0.55), y_c - 8, 30, 6, 'F') # Naranja
-            pdf.set_fill_color(33, 150, 243); pdf.rect(x_c + (w_c * 0.35), y_c - 8, 30, 6, 'F') # Azul
-
-            # Campo Verde
+            pdf.set_fill_color(255, 152, 0); pdf.rect(x_c + (w_c * 0.55), y_c - 8, 30, 6, 'F') 
+            pdf.set_fill_color(33, 150, 243); pdf.rect(x_c + (w_c * 0.35), y_c - 8, 30, 6, 'F') 
             pdf.set_fill_color(67, 160, 71); pdf.rect(x_c, y_c, w_c, h_c, 'F') 
             pdf.set_draw_color(255, 255, 255); pdf.set_line_width(0.6); pdf.rect(x_c, y_c, w_c, h_c) 
-            
-            # Líneas reglamentarias: Medio y 23 metros
             pdf.line(x_c + w_c/2, y_c, x_c + w_c/2, y_c + h_c) 
             pdf.line(x_c + (w_c * 0.25), y_c, x_c + (w_c * 0.25), y_c + h_c) 
             pdf.line(x_c + (w_c * 0.75), y_c, x_c + (w_c * 0.75), y_c + h_c) 
-            
-            # Punto Central
             pdf.set_fill_color(255, 255, 255); pdf.ellipse(x_c + w_c/2 - 1.5, y_c + h_c/2 - 1.5, 3, 3, 'F')
 
-            # ÁREAS AGRANDADAS
-            r_solid = 45 # Crecido
-            r_dash = 60 # Crecido
-            
+            # Areas
+            r_solid = 45; r_dash = 60 
             pdf.set_draw_color(255, 255, 255); pdf.set_line_width(0.7)
-            # Semicírculos Sólidos
             pdf.ellipse(x_c - r_solid/2, y_c + h_c/2 - r_solid/2, r_solid, r_solid, 'D')
             pdf.ellipse(x_c + w_c - r_solid/2, y_c + h_c/2 - r_solid/2, r_solid, r_solid, 'D')
-            
-            # OFFSET PUNTEADO AL MÁXIMO
             pdf.set_line_width(0.8)
-            # Simulación punteado grueso manual para que se note mucho más
             for ang in range(-90, 91, 8):
                 pdf.ellipse(x_c - r_dash/2, y_c + h_c/2 - r_dash/2, r_dash, r_dash, 'D')
                 pdf.ellipse(x_c + w_c - r_dash/2, y_c + h_c/2 - r_dash/2, r_dash, r_dash, 'D')
-            
-            # Limpiar bordes para semicírculos perfectos
             pdf.set_fill_color(255, 255, 255); pdf.set_draw_color(255, 255, 255)
-            pdf.rect(0, y_c, x_c-0.1, h_c, 'F')
-            pdf.rect(x_c + w_c + 0.1, y_c, 30, h_c, 'F')
+            pdf.rect(0, y_c, x_c-0.1, h_c, 'F'); pdf.rect(x_c + w_c + 0.1, y_c, 30, h_c, 'F')
             pdf.set_draw_color(255, 255, 255); pdf.set_line_width(0.6); pdf.rect(x_c, y_c, w_c, h_c, 'D')
-
-            # ARCOS GRISES
             pdf.set_fill_color(130, 130, 130)
-            pdf.rect(x_c - 3, y_c + h_c/2 - 6, 3, 12, 'F') 
-            pdf.rect(x_c + w_c, y_c + h_c/2 - 6, 3, 12, 'F') 
-
-            # BORDE ROSITA FINAL (SOBRE TODO EL PERÍMETRO)
+            pdf.rect(x_c - 3, y_c + h_c/2 - 6, 3, 12, 'F'); pdf.rect(x_c + w_c, y_c + h_c/2 - 6, 3, 12, 'F') 
             pdf.set_draw_color(255, 182, 193); pdf.set_line_width(1.5)
             pdf.rect(x_c - 0.5, y_c - 0.5, w_c + 1, h_c + 1, 'D')
 
-            # COORDENADAS (Doble 5)
             coords = {
                 "Arquera (1)": (0.05, 0.5), "Libero (2)": (0.15, 0.5), "Stopper (6)": (0.22, 0.5),
                 "Half Der. (4)": (0.24, 0.15), "Half Izq. (3)": (0.24, 0.85),
@@ -249,27 +225,21 @@ def main(page: ft.Page):
             if esquema_str == "Doble 5":
                 coords["Libero (2)"] = (0.45, 0.35); coords["Volante Central (5)"] = (0.45, 0.65); coords["Stopper (6)"] = (0.15, 0.5)
 
-            # DIBUJAR JUGADORAS (NOMBRE Y APELLIDO COMPLETO)
             for pos, jug in titulares_dict.items():
                 if not jug: continue 
                 px, py = coords.get(pos, (0.5, 0.5))
                 ax, ay = x_c + (w_c * px), y_c + (h_c * py)
-                
                 if "Arquera" in pos: pdf.set_fill_color(244, 67, 54) 
                 else: pdf.set_fill_color(33, 150, 243) 
-                
                 pdf.set_draw_color(255, 255, 255); pdf.ellipse(ax-4, ay-4, 8, 8, 'FD')
                 pdf.set_font("Arial", 'B', 8); pdf.set_text_color(255, 255, 255)
                 n_p = re.search(r"\((\d+)\)", pos).group(1) if "(" in pos else "!"
                 pdf.text(ax - 1.5, ay + 1, n_p)
-                
-                # Nombre y Apellido completo
                 nom_comp = clean_latin(jug)
                 pdf.set_font("Arial", 'B', 7.5); w_n = pdf.get_string_width(nom_comp) + 4
                 pdf.set_fill_color(0, 0, 0); pdf.rect(ax - w_n/2, ay + 5, w_n, 4, 'F')
                 pdf.text(ax - w_n/2 + 2, ay + 8, nom_comp)
 
-            # LISTADOS
             y_inf = y_c + h_c + 4
             pdf.set_xy(x_c, y_inf); pdf.set_font("Arial", 'B', 10); pdf.set_text_color(0); pdf.cell(0, 5, "SUPLENTES:", ln=1)
             pdf.set_font("Arial", '', 9)
@@ -280,7 +250,7 @@ def main(page: ft.Page):
             pdf.set_font("Arial", '', 9); txt_a = [f"{clean_latin(a['nombre'])} ({clean_latin(a['motivo'])})" if a['motivo'] else clean_latin(a['nombre']) for a in ausentes_list]
             pdf.multi_cell(w_c, 4, "   |   ".join(txt_a) if txt_a else "-")
             
-            # --- SISTEMA NUEVO DE GUARDADO (ASSETS) ---
+            # --- GUARDADO EN ASSETS ---
             ts = int(time.time())
             nombre_archivo = f"formacion_{ts}.pdf"
             ruta_completa = os.path.join("assets", nombre_archivo)
@@ -320,7 +290,6 @@ def main(page: ft.Page):
                     v = dd.value; libres = obtener_libres()
                     dd.options = [ft.dropdown.Option("")] + [ft.dropdown.Option(n) for n in sorted(list(set(([v] if v else []) + libres)))]
                     dd.value = v; dd.update()
-            
             dispo = obtener_libres()
             if dd_nueva_ausente.page: 
                 dd_nueva_ausente.options = [ft.dropdown.Option(n) for n in dispo]
@@ -370,10 +339,10 @@ def main(page: ft.Page):
             ok, res, url_pdf = generar_pdf_formacion(dd_partido.value, dd_esquema.value, tits, lista_ausentes_data, obtener_libres(), categoria_actual[0])
             
             if ok:
-                txt_estado.value = "✅ Archivo generado. Click en el ojo."
+                txt_estado.value = "✅ Link Listo. Click en el ojo."
                 btn_ojo.disabled = False
                 btn_ojo.icon_color = C_AZUL
-                btn_ojo.url = url_pdf
+                btn_ojo.url = url_pdf # ASIGNACIÓN DIRECTA
                 btn_ojo.update()
             else:
                 txt_estado.value = f"❌ Error Gen: {res}"
@@ -393,12 +362,11 @@ def main(page: ft.Page):
         ], scroll="auto")
 
     # =========================================================
-    # PDF INDIVIDUAL (DISEÑO VIEJO + SISTEMA NUEVO)
+    # PDF INDIVIDUAL
     # =========================================================
     def generar_pdf_individual(jug_data, stats_globales):
         if not TIENE_PDF: return False, "Falta fpdf", None
         try:
-            # --- LÓGICA DEL CÓDIGO VIEJO ---
             pdf = FPDF(); pdf.add_page()
             dni_jug = str(jug_data['dni'])
             anio_act = datetime.now().year
@@ -407,8 +375,6 @@ def main(page: ft.Page):
             pdf.set_font("Arial", 'B', 10); pdf.set_text_color(100, 100, 100)
             pdf.cell(0, 5, f"TEMPORADA {anio_act}  -  CATEGORIA: {cat_actual.upper()}", ln=1, align='R'); pdf.ln(5)
             pdf.set_font("Arial", 'B', 24); pdf.set_text_color(33, 150, 243)
-            
-            # NOMBRE CON Ñ
             nombre_str = clean_latin(f"{jug_data['nombre']} {jug_data['apellido']}".upper())
             pdf.cell(0, 15, nombre_str, ln=1, align='C')
             
@@ -421,10 +387,8 @@ def main(page: ft.Page):
                 pdf.set_font("Arial", '', 11); pdf.cell(0, 8, clean_latin(str(value)), 0, 1)
             
             print_dato("Fecha de Nacimiento:", f"{jug_data['nacimiento']} ({calcular_edad(jug_data['nacimiento'])} anos)")
-            print_dato("DNI:", dni_jug)
-            print_dato("N Camiseta:", jug_data.get('camiseta', '-'))
-            print_dato("Posicion:", jug_data.get('posicion', '-'))
-            print_dato("Telefono:", jug_data.get('telefono', '-'))
+            print_dato("DNI:", dni_jug); print_dato("N Camiseta:", jug_data.get('camiseta', '-'))
+            print_dato("Posicion:", jug_data.get('posicion', '-')); print_dato("Telefono:", jug_data.get('telefono', '-'))
             pdf.ln(8)
             
             pdf.set_font("Arial", 'B', 12); pdf.set_fill_color(240, 240, 240)
@@ -516,8 +480,7 @@ def main(page: ft.Page):
             pdf.set_font("Arial", '', 12)
             pdf.cell(0, 10, f"Goles convertidos en la temporada: {goles_totales}", 0, 1, 'L')
             
-            # --- PIE DE PÁGINA FIX ---
-            pdf.set_auto_page_break(False) # Evita saltar a hoja nueva
+            pdf.set_auto_page_break(False) 
             pdf.set_y(-15)
             pdf.set_font("Arial", 'I', 8); pdf.set_text_color(128)
             pdf.cell(0, 10, f"Pagina {pdf.page_no()}", 0, 0, 'L') 
@@ -532,12 +495,11 @@ def main(page: ft.Page):
         except Exception as e: return False, str(e), None
 
     # =========================================================
-    # PDF MENSUAL (DISEÑO VIEJO + SISTEMA NUEVO)
+    # PDF MENSUAL
     # =========================================================
     def generar_pdf_mensual_grafico(mes_num, anio, categoria):
         if not TIENE_PDF: return False, "Falta fpdf", None
         try:
-            # --- LÓGICA DEL CÓDIGO VIEJO ---
             raw_asist = ws_asistencia.get_all_values()
             datos = {str(j['dni']): {"nombre": f"{j['apellido']} {j['nombre']}", "dias": {}} for j in lista_jugadoras_raw}
             observaciones_mes = {}; dias_suspendidos = set()
@@ -783,7 +745,7 @@ def main(page: ft.Page):
             col_stats.controls.append(ft.Container(content=ft.Row([ft.Text("JUGADORA", width=120, weight="bold"), ft.Text("ENE", width=30, size=10), ft.Text("FEB", width=30, size=10), ft.Text("MAR", width=30, size=10), ft.Text("TOT", width=40, weight="bold", color=C_AZUL)]), bgcolor=C_GRIS, padding=5))
             for dni, d in stats.items():
                 tot = sum([d[m] for m in range(1,13)])
-                col_stats.controls.append(ft.Container(content=ft.Row([ft.Text(d['nombre'], width=120, size=12, no_wrap=True), ft.Text(str(d[1]), width=30), ft.Text(str(d[2]), width=30), ft.Text(str(d[3]), width=30), ft.Text(str(tot), width=40, weight="bold")]), padding=5, border=ft.border.only(bottom=ft.border.BorderSide(1, "#EEE"))))
+                col_stats.controls.append(ft.Container(content=ft.Row([ft.Text(d['nombre'], width=120, size=12, no_wrap=True), ft.Text(str(d[1]), width=30), ft.Text(str(d[2]), width=30), ft.Text(str(d[3]), width=30), ft.Text(str(tot), width=40, weight="bold")]), padding=5, border=ft.Border.all(1, "#EEE"))))
             txt_estado.value = "✅ Listado"
         except: pass
         return ft.Column([ft.Text("Estadísticas", size=20, weight="bold"), ft.ElevatedButton("Volver", on_click=lambda e:navegar("asis")), ft.Divider(), ft.Container(content=col_stats, height=600, border=ft.Border.all(1,C_GRIS))])
@@ -943,7 +905,7 @@ def main(page: ft.Page):
         items = []
         for j in lista_jugadoras_raw:
             btn = ft.ElevatedButton("✏️", bgcolor=C_BLANCO, color=C_AZUL, width=50, on_click=lambda e, x=j: form(x))
-            items.append(ft.Container(content=ft.Row([ft.Text("👤", size=20), ft.Column([ft.Text(f"{j['nombre']} {j['apellido']}", weight="bold"), ft.Text(f"Camiseta: {j.get('camiseta','-')}", size=12, color="grey")], expand=True), btn]), padding=10, border=ft.border.only(bottom=ft.border.BorderSide(1, "#EEE"))))
+            items.append(ft.Container(content=ft.Row([ft.Text("👤", size=20), ft.Column([ft.Text(f"{j['nombre']} {j['apellido']}", weight="bold"), ft.Text(f"Camiseta: {j.get('camiseta','-')}", size=12, color="grey")], expand=True), btn]), padding=10, border=ft.Border.all(1, "#EEE"))))
         return ft.Column([ft.Row([ft.Text("Mi Plantel", size=20, weight="bold"), ft.ElevatedButton("+ ALTA", on_click=lambda e:form(None), bgcolor=C_AZUL, color="white")], alignment="spaceBetween"), ft.Column(items, spacing=5)])
 
     def vista_reporte_completo():
