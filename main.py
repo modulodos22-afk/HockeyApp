@@ -1185,13 +1185,12 @@ def main(page: ft.Page):
 
 if __name__ == "__main__":
     # --- CONFIGURACIÓN PARA RENDER ---
-    # Render nos da un puerto, si no, usamos el 8000
     port = int(os.environ.get("PORT", 8000))
     
-    # Aquí está el cambio clave: host="0.0.0.0"
+    # CORRECCIÓN: Usamos ft.AppView.WEB_BROWSER y mantenemos el host="0.0.0.0"
     ft.app(
         target=main, 
-        view=ft.WEB_BROWSER, 
+        view=ft.AppView.WEB_BROWSER, 
         port=port, 
         host="0.0.0.0", 
         assets_dir="assets"
