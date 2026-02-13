@@ -1183,7 +1183,16 @@ def main(page: ft.Page):
     columna_contenido.controls.append(vista_asistencia())
     page.add(menu, contenedor_principal, ft.Container(content=txt_estado, padding=5, bgcolor="#EEE"))
 
-# --- CONFIGURACIÓN PARA RENDER ---
-port = int(os.environ.get("PORT", 8502))
-# IMPORTANTE: Definimos assets_dir para que Flet sirva los PDFs
-ft.app(target=main, view=ft.AppView.WEB_BROWSER, port=port, assets_dir="assets")
+if __name__ == "__main__":
+    # --- CONFIGURACIÓN PARA RENDER ---
+    # Render nos da un puerto, si no, usamos el 8000
+    port = int(os.environ.get("PORT", 8000))
+    
+    # Aquí está el cambio clave: host="0.0.0.0"
+    ft.app(
+        target=main, 
+        view=ft.WEB_BROWSER, 
+        port=port, 
+        host="0.0.0.0", 
+        assets_dir="assets"
+    )
