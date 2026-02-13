@@ -745,7 +745,7 @@ def main(page: ft.Page):
             col_stats.controls.append(ft.Container(content=ft.Row([ft.Text("JUGADORA", width=120, weight="bold"), ft.Text("ENE", width=30, size=10), ft.Text("FEB", width=30, size=10), ft.Text("MAR", width=30, size=10), ft.Text("TOT", width=40, weight="bold", color=C_AZUL)]), bgcolor=C_GRIS, padding=5))
             for dni, d in stats.items():
                 tot = sum([d[m] for m in range(1,13)])
-                col_stats.controls.append(ft.Container(content=ft.Row([ft.Text(d['nombre'], width=120, size=12, no_wrap=True), ft.Text(str(d[1]), width=30), ft.Text(str(d[2]), width=30), ft.Text(str(d[3]), width=30), ft.Text(str(tot), width=40, weight="bold")]), padding=5, border=ft.Border.all(1, "#EEE"))))
+                col_stats.controls.append(ft.Container(content=ft.Row([ft.Text(d['nombre'], width=120, size=12, no_wrap=True), ft.Text(str(d[1]), width=30), ft.Text(str(d[2]), width=30), ft.Text(str(d[3]), width=30), ft.Text(str(tot), width=40, weight="bold")]), padding=5, border=ft.Border.all(1, "#EEE")))
             txt_estado.value = "✅ Listado"
         except: pass
         return ft.Column([ft.Text("Estadísticas", size=20, weight="bold"), ft.ElevatedButton("Volver", on_click=lambda e:navegar("asis")), ft.Divider(), ft.Container(content=col_stats, height=600, border=ft.Border.all(1,C_GRIS))])
@@ -1196,3 +1196,4 @@ if __name__ == "__main__":
         host="0.0.0.0", 
         assets_dir="assets"
     )
+
