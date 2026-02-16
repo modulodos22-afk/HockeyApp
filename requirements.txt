@@ -1,5 +1,4 @@
 flet
 gspread
-oauth2client
+google-auth
 fpdf2
-wsgiref
