@@ -1,4 +1,4 @@
 flet
-gspread==5.10.0
+gspread
 oauth2client
-fpdf2
+fpdf
