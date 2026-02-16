@@ -1,4 +1,4 @@
 flet
 gspread
 oauth2client
-fpdf
+fpdf2
