@@ -14,43 +14,39 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 1. Instalar librerías de Linux necesarias para que el Doctor esté feliz
+      # 1. Instalar librerías de Linux (Necesarias para que Flet compile)
       - name: Install Linux Dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev clang cmake ninja-build pkg-config libblkid-dev liblzma-dev
 
+      # 2. Instalar Java (Necesario para Android)
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.24.0'
-
+      # 3. Instalar Python
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
+      # 4. Instalar Flet y tus requerimientos
       - name: Install App Dependencies
         run: |
           pip install flet
           pip install -r requirements.txt
 
-      # 2. Aceptar licencias de Android explícitamente
-      - name: Accept Android Licenses
-        run: |
-          yes | flutter doctor --android-licenses
-
-      # 3. Construir el APK (Ahora sí, con todo listo)
+      # 5. Construir el APK
+      # NOTA: Al no instalar Flutter antes, Flet descargará la versión correcta solo.
+      # Quitamos el "yes |" porque ya no habrá preguntas de conflicto.
       - name: Build APK
         run: |
           flet build apk --verbose
 
+      # 6. Subir el archivo para descargar
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
