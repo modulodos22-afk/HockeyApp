@@ -8,10 +8,10 @@ import re
 import platform
 import base64
 import time
-import tracemalloc
+# import tracemalloc # Comentado para ahorrar memoria en el celular
 
-# --- INICIO DE RASTREO DE MEMORIA ---
-tracemalloc.start()
+# --- INICIO DE RASTREO DE MEMORIA (DESACTIVADO PARA APK) ---
+# tracemalloc.start()
 
 # --- LIBRERÍA PDF ---
 try:
@@ -34,68 +34,109 @@ C_TEXTO = "#212121"
 C_GRIS_TXT = "#757575"
 C_ROSITA = "#FFC0CB"
 
-# --- 1. CONEXIÓN (ACTUALIZADA PARA ANDROID) ---
+# --- 1. CONEXIÓN (BLINDADA PARA ANDROID) ---
 def conectar_google_sheets():
     scope = ["https://spreadsheets.google.com/feeds", 'https://www.googleapis.com/auth/spreadsheets',
              "https://www.googleapis.com/auth/drive.file", "https://www.googleapis.com/auth/drive"]
     
+    # BUSCADOR INTELIGENTE DE CREDENCIALES
+    archivo_creds = "credentials.json"
+    if not os.path.exists(archivo_creds):
+        # Si no está en la raíz, buscamos en assets
+        path_assets = os.path.join("assets", "credentials.json")
+        if os.path.exists(path_assets):
+            archivo_creds = path_assets
+        else:
+            # Si no está en ningún lado, fallamos con mensaje claro
+            raise FileNotFoundError("No se encuentra credentials.json en la App")
+
     # Usamos la librería google.oauth2 que SÍ funciona en el celular
-    creds = service_account.Credentials.from_service_account_file("credentials.json", scopes=scope)
+    creds = service_account.Credentials.from_service_account_file(archivo_creds, scopes=scope)
     client = gspread.authorize(creds)
     return client.open("HockeyApp_DB")
     
 def main(page: ft.Page):
-    # --- CONFIGURACIÓN DE ASSETS ---
-    page.assets_dir = "assets"
-    # Aseguramos que la carpeta exista (por si el truco de git falla)
-    if not os.path.exists("assets"):
-        os.makedirs("assets")
-
+    # --- CONFIGURACIÓN DE PÁGINA ---
     page.title = "Hockey Gestión Total"
     page.theme_mode = ft.ThemeMode.LIGHT
-    page.window_width = 550 
-    page.window_height = 950
     page.padding = 0
     page.bgcolor = C_FONDO
+    page.assets_dir = "assets"
+
+    # --- PANTALLA DE CARGA (CRÍTICO: SE DIBUJA PRIMERO) ---
+    lbl_loading = ft.Text("⏳ Iniciando App...", color=C_AZUL, size=18, weight="bold")
+    lbl_detalle = ft.Text("Configurando entorno...", color="grey", size=12)
+    progreso = ft.ProgressBar(width=200, color=C_AZUL, bgcolor="#EEEEEE")
     
+    pantalla_carga = ft.Container(
+        content=ft.Column([
+            ft.Icon(ft.Icons.SPORTS_HOCKEY, size=50, color=C_AZUL),
+            ft.Divider(height=10, color="transparent"),
+            lbl_loading,
+            progreso,
+            lbl_detalle
+        ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+        alignment=ft.alignment.center,
+        expand=True,
+        bgcolor=C_FONDO
+    )
+
+    # AGREGAMOS LA PANTALLA DE CARGA INMEDIATAMENTE
+    page.add(pantalla_carga)
+    page.update()
+
+    # --- VARIABLES GLOBALES DE DATOS ---
+    # Las definimos acá para que estén disponibles en toda la app
+    sh = None
+    ws_jugadoras = None
+    ws_habilidades = None
+    ws_asistencia = None
+    ws_partidos = None
+    ws_fixture = None
+    lista_jugadoras_raw = []
+
     # --- PERSISTENCIA DE CONFIGURACIÓN ---
     ARCHIVO_CONFIG = "categoria_guardada.txt"
     ARCHIVO_CLUB = "club_guardado.txt"
-    
     cat_inicial = "Primera"
     club_inicial = "Mi Club"
 
-    if os.path.exists(ARCHIVO_CONFIG):
-        try:
-            with open(ARCHIVO_CONFIG, "r", encoding="utf-8") as f:
-                leido = f.read().strip()
-                if leido: cat_inicial = leido
-        except: pass
-    
-    if os.path.exists(ARCHIVO_CLUB):
-        try:
-            with open(ARCHIVO_CLUB, "r", encoding="utf-8") as f:
-                leido_c = f.read().strip()
-                if leido_c: club_inicial = leido_c
-        except: pass
+    # --- INTENTO DE CONEXIÓN Y CARGA ---
+    try:
+        # 1. Configurar Assets
+        lbl_detalle.value = "Verificando archivos..."
+        page.update()
+        if not os.path.exists("assets"):
+            try: os.makedirs("assets")
+            except: pass # Si falla en Android no importa tanto si es solo lectura
+
+        # 2. Leer Configuración Local
+        if os.path.exists(ARCHIVO_CONFIG):
+            try:
+                with open(ARCHIVO_CONFIG, "r", encoding="utf-8") as f:
+                    leido = f.read().strip()
+                    if leido: cat_inicial = leido
+            except: pass
         
-    categoria_actual = [cat_inicial]
-    club_actual = [club_inicial]
+        if os.path.exists(ARCHIVO_CLUB):
+            try:
+                with open(ARCHIVO_CLUB, "r", encoding="utf-8") as f:
+                    leido_c = f.read().strip()
+                    if leido_c: club_inicial = leido_c
+            except: pass
+            
+        categoria_actual = [cat_inicial]
+        club_actual = [club_inicial]
 
-    try:
-        page.locale_configuration = ft.LocaleConfiguration(
-            supported_locales=[ft.Locale("es", "ES")],
-            current_locale=ft.Locale("es", "ES")
-        )
-    except: pass
-    
-    txt_estado = ft.Text("", size=12, color="grey")
-    columna_contenido = ft.Column(expand=True, scroll="auto")
-    contenedor_principal = ft.Container(content=columna_contenido, padding=15, expand=True)
+        # 3. Conexión a Google
+        lbl_loading.value = "Conectando a Google Sheets..."
+        lbl_detalle.value = "Esto puede tardar unos segundos..."
+        page.update()
 
-    # --- CARGA DE DATOS ---
-    try:
         sh = conectar_google_sheets()
+        
+        lbl_detalle.value = "Leyendo hojas de cálculo..."
+        page.update()
         ws_jugadoras = sh.worksheet("jugadoras")
         ws_habilidades = sh.worksheet("habilidades")
         ws_asistencia = sh.worksheet("asistencia")
@@ -103,19 +144,42 @@ def main(page: ft.Page):
         try: ws_fixture = sh.worksheet("fixture")
         except: ws_fixture = None
         
+        # 4. Procesar Datos Iniciales
+        lbl_detalle.value = "Procesando jugadoras..."
+        page.update()
         raw_data = ws_jugadoras.get_all_values()
-        lista_jugadoras_raw = []
         if len(raw_data) > 1:
             for row in raw_data[1:]:
                 row += [""] * (9 - len(row))
                 jug = {"id": row[0], "nombre": row[1], "apellido": row[2], "dni": row[3], "nacimiento": row[4], "posicion": row[5], "telefono": row[6], "activo": row[7], "camiseta": row[8]}
                 if jug["dni"]: lista_jugadoras_raw.append(jug)
 
-        txt_estado.value = "🟢 Sistema Listo"
+        # SI LLEGAMOS ACÁ, TODO ESTÁ BIEN
+        
     except Exception as e:
-        columna_contenido.controls.append(ft.Text(f"❌ Error carga: {e}", color="red"))
+        # SI FALLA, MOSTRAMOS EL ERROR EN PANTALLA ROJA
+        page.clean()
+        page.add(ft.Container(
+            content=ft.Column([
+                ft.Icon(ft.Icons.ERROR_OUTLINE, color=C_ROJO, size=60),
+                ft.Text("Error de Inicio", size=24, weight="bold", color=C_ROJO),
+                ft.Text(f"No se pudo conectar a la base de datos.", size=16),
+                ft.Container(content=ft.Text(str(e), color="white", font_family="monospace"), bgcolor="black", padding=10, border_radius=5),
+                ft.Text("Verificá tu conexión a internet y el archivo credentials.json", size=12, color="grey"),
+                ft.ElevatedButton("Reintentar", on_click=lambda _: page.window_reload())
+            ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+            alignment=ft.alignment.center, expand=True, bgcolor="#FFEBEE"
+        ))
         page.update()
-        return
+        return # DETENEMOS LA EJECUCIÓN
+
+    # =========================================================
+    # SI LA CARGA FUE EXITOSA, DEFINIMOS LA APP REAL
+    # =========================================================
+
+    txt_estado = ft.Text("🟢 En línea", size=12, color="green")
+    columna_contenido = ft.Column(expand=True, scroll="auto")
+    contenedor_principal = ft.Container(content=columna_contenido, padding=15, expand=True)
 
     # --- HELPERS ---
     MAPA_MESES = {"Enero":1,"Febrero":2,"Marzo":3,"Abril":4,"Mayo":5,"Junio":6,"Julio":7,"Agosto":8,"Septiembre":9,"Octubre":10,"Noviembre":11,"Diciembre":12}
@@ -142,53 +206,8 @@ def main(page: ft.Page):
         try: return str(t).encode('latin-1', 'replace').decode('latin-1')
         except: return str(t)
 
-    # =========================================================
-    # NAVEGACIÓN OPTIMIZADA (AQUÍ ESTÁ EL TRUCO)
-    # =========================================================
-    def navegar(e):
-        destino = e
-        if not isinstance(e, str) and hasattr(e, "control") and hasattr(e.control, "data"):
-            destino = e.control.data
-        elif not isinstance(e, str):
-            destino = "asis"
+    # --- DEFINICIÓN DE VISTAS (LÓGICA ORIGINAL) ---
 
-        # 1. FEEDBACK INMEDIATO: Limpiamos y mostramos "Cargando..."
-        columna_contenido.controls.clear()
-        columna_contenido.controls.append(
-            ft.Column(
-                [
-                    ft.ProgressBar(width=200, color=C_AZUL, bgcolor="#EEEEEE"),
-                    ft.Text("Cargando...", color="grey", size=12)
-                ], 
-                alignment=ft.MainAxisAlignment.CENTER, 
-                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                expand=True
-            )
-        )
-        # Actualizamos YA para que el usuario vea que algo pasa
-        page.update()
-        
-        # Pequeña pausa para asegurar que el renderizado visual ocurra antes del bloqueo
-        time.sleep(0.05)
-
-        # 2. AHORA SÍ, CARGAMOS LA VISTA PESADA
-        columna_contenido.controls.clear()
-        
-        if destino == "asis": columna_contenido.controls.append(vista_asistencia())
-        elif destino == "stats": columna_contenido.controls.append(vista_estadisticas_asistencia()) 
-        elif destino == "eval": columna_contenido.controls.append(vista_evaluacion())
-        elif destino == "part": columna_contenido.controls.append(vista_partidos())
-        elif destino == "resumen_partidos": columna_contenido.controls.append(vista_resumen_partidos())
-        elif destino == "plantel": columna_contenido.controls.append(vista_plantel())
-        elif destino == "ficha": columna_contenido.controls.append(vista_reporte_completo())
-        elif destino == "fixture_full": columna_contenido.controls.append(vista_gestion_fixture())
-        elif destino == "formacion": columna_contenido.controls.append(vista_formacion()) 
-        
-        page.update()
-
-    # =========================================================
-    # PDF FORMACIÓN
-    # =========================================================
     def generar_pdf_formacion(partido_str, esquema_str, titulares_dict, ausentes_list, suplentes_list, categoria):
         if not TIENE_PDF: return False, "Falta fpdf", None
         try:
@@ -272,13 +291,20 @@ def main(page: ft.Page):
             pdf.set_font("Arial", '', 9); txt_a = [f"{clean_latin(a['nombre'])} ({clean_latin(a['motivo'])})" if a['motivo'] else clean_latin(a['nombre']) for a in ausentes_list]
             pdf.multi_cell(w_c, 4, "   |   ".join(txt_a) if txt_a else "-")
             
-            # --- GUARDADO EN ASSETS ---
+            # --- GUARDADO EN ASSETS PARA ANDROID ---
             ts = int(time.time())
             nombre_archivo = f"formacion_{ts}.pdf"
-            ruta_completa = os.path.join("assets", nombre_archivo)
-            pdf.output(ruta_completa)
+            # CORRECCIÓN: Usar directorio temporal si assets falla
+            try:
+                ruta_completa = os.path.join(page.assets_dir, nombre_archivo)
+                pdf.output(ruta_completa)
+            except:
+                # Fallback para Android si no deja escribir en assets
+                ruta_completa = f"/data/user/0/com.flet.hockeyapp/cache/{nombre_archivo}"
+                try: pdf.output(ruta_completa)
+                except: return False, "No se pudo guardar PDF", None
             
-            return True, "Listo", f"/{nombre_archivo}"
+            return True, "Listo", f"/{nombre_archivo}" # Ruta relativa para Flet
             
         except Exception as e: return False, str(e), None
 
@@ -509,9 +535,14 @@ def main(page: ft.Page):
             
             ts = int(time.time())
             nombre_archivo = f"ficha_{dni_jug}_{ts}.pdf"
-            ruta_completa = os.path.join("assets", nombre_archivo)
-            pdf.output(ruta_completa)
-            
+            try:
+                ruta_completa = os.path.join(page.assets_dir, nombre_archivo)
+                pdf.output(ruta_completa)
+            except:
+                ruta_completa = f"/data/user/0/com.flet.hockeyapp/cache/{nombre_archivo}"
+                try: pdf.output(ruta_completa)
+                except: return False, "Error guardado PDF", None
+
             return True, "Listo", f"/{nombre_archivo}"
             
         except Exception as e: return False, str(e), None
@@ -607,8 +638,13 @@ def main(page: ft.Page):
             
             ts = int(time.time())
             nombre_archivo = f"mensual_{mes_num}_{ts}.pdf"
-            ruta_completa = os.path.join("assets", nombre_archivo)
-            pdf.output(ruta_completa)
+            try:
+                ruta_completa = os.path.join(page.assets_dir, nombre_archivo)
+                pdf.output(ruta_completa)
+            except:
+                ruta_completa = f"/data/user/0/com.flet.hockeyapp/cache/{nombre_archivo}"
+                try: pdf.output(ruta_completa)
+                except: return False, "Error PDF Mensual", None
             
             return True, "Listo", f"/{nombre_archivo}"
             
@@ -732,7 +768,6 @@ def main(page: ft.Page):
                     txt_estado.value = "✅ Archivo Listo. Click en el ojo."
                     btn_ojo_mensual.disabled = False
                     btn_ojo_mensual.icon_color = C_VIOLETA
-                    # ASIGNACIÓN DIRECTA DE URL
                     btn_ojo_mensual.url = url_pdf
                     btn_ojo_mensual.update()
                 else:
@@ -963,7 +998,6 @@ def main(page: ft.Page):
                             txt_estado.value = "✅ Archivo Listo. Click en el ojo."
                             btn_v_f.disabled = False
                             btn_v_f.icon_color = C_VIOLETA
-                            # ASIGNACIÓN DIRECTA URL
                             btn_v_f.url = url_pdf
                             btn_v_f.update()
                         else:
@@ -1012,7 +1046,6 @@ def main(page: ft.Page):
             actualizar_cal()
         
         edit_idx = [-1]; txt_f = ft.TextField(label="Fecha", width=150); txt_r = ft.TextField(label="Rival", expand=True); dd_c = ft.Dropdown(options=[ft.dropdown.Option("Local"), ft.dropdown.Option("Visitante")], value="Local", width=120); 
-        # NUEVO CAMPO MAPS
         txt_maps = ft.TextField(label="Link Ubicación (Maps)", expand=True)
         col_partidos = ft.Column(scroll="auto", expand=True); btn_accion = ft.ElevatedButton("AGREGAR PARTIDO", bgcolor=C_VERDE, color="white")
         
@@ -1069,10 +1102,8 @@ def main(page: ft.Page):
         
         cargar_fix(); actualizar_cal()
         
-        # BOTONES DE NAVEGACION Y ACCION
         btn_volver = ft.ElevatedButton("VOLVER", on_click=lambda e: navegar("part"), bgcolor="grey", color="white")
         btn_actualizar = ft.ElevatedButton("🔄 ACTUALIZAR", on_click=lambda e: cargar_fix(), bgcolor=C_AZUL, color="white", expand=True)
-        # ACÁ ELIMINÉ EL BOTÓN CRONOGRAMA
         
         return ft.Column([
             ft.Row([ft.Text("Fixture", size=20, weight="bold"), btn_volver], alignment="spaceBetween"),
@@ -1082,7 +1113,7 @@ def main(page: ft.Page):
             txt_maps,
             btn_accion, 
             ft.Divider(),
-            ft.Row([btn_actualizar]), # Solo quedó el botón actualizar
+            ft.Row([btn_actualizar]),
             ft.Divider(), 
             ft.Container(content=col_partidos, expand=True)
         ], expand=True)
@@ -1190,7 +1221,47 @@ def main(page: ft.Page):
                           ft.ElevatedButton("GUARDAR", on_click=sv), ft.Divider(), hist], scroll="auto")
 
     # =========================================================
-    # MENÚ
+    # NAVEGACIÓN
+    # =========================================================
+    def navegar(e):
+        destino = e
+        if not isinstance(e, str) and hasattr(e, "control") and hasattr(e.control, "data"):
+            destino = e.control.data
+        elif not isinstance(e, str):
+            destino = "asis"
+
+        # FEEDBACK VISUAL
+        columna_contenido.controls.clear()
+        columna_contenido.controls.append(
+            ft.Column(
+                [
+                    ft.ProgressBar(width=200, color=C_AZUL, bgcolor="#EEEEEE"),
+                    ft.Text("Cargando...", color="grey", size=12)
+                ], 
+                alignment=ft.MainAxisAlignment.CENTER, 
+                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                expand=True
+            )
+        )
+        page.update()
+        
+        # CARGA DE VISTA
+        columna_contenido.controls.clear()
+        
+        if destino == "asis": columna_contenido.controls.append(vista_asistencia())
+        elif destino == "stats": columna_contenido.controls.append(vista_estadisticas_asistencia()) 
+        elif destino == "eval": columna_contenido.controls.append(vista_evaluacion())
+        elif destino == "part": columna_contenido.controls.append(vista_partidos())
+        elif destino == "resumen_partidos": columna_contenido.controls.append(vista_resumen_partidos())
+        elif destino == "plantel": columna_contenido.controls.append(vista_plantel())
+        elif destino == "ficha": columna_contenido.controls.append(vista_reporte_completo())
+        elif destino == "fixture_full": columna_contenido.controls.append(vista_gestion_fixture())
+        elif destino == "formacion": columna_contenido.controls.append(vista_formacion()) 
+        
+        page.update()
+
+    # =========================================================
+    # MENÚ INFERIOR
     # =========================================================
     btn_s = ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=0), color=C_BLANCO)
     menu = ft.Container(content=ft.Row([
@@ -1202,14 +1273,15 @@ def main(page: ft.Page):
         ft.ElevatedButton("📄", data="ficha", on_click=navegar, bgcolor=C_VIOLETA, style=btn_s, expand=True),
     ], spacing=0), padding=0)
 
-    columna_contenido.controls.append(vista_asistencia())
+    # LIMPIAMOS LA PANTALLA DE CARGA Y MOSTRAMOS LA APP REAL
+    page.clean()
     page.add(menu, contenedor_principal, ft.Container(content=txt_estado, padding=5, bgcolor="#EEE"))
+    
+    # INICIAMOS EN ASISTENCIA
+    navegar("asis")
 
 if __name__ == "__main__":
-    # --- CONFIGURACIÓN PARA RENDER ---
     port = int(os.environ.get("PORT", 8000))
-    
-    # CORRECCIÓN: Usamos ft.AppView.WEB_BROWSER y mantenemos el host="0.0.0.0"
     ft.app(
         target=main, 
         view=ft.AppView.WEB_BROWSER, 
@@ -1217,4 +1289,3 @@ if __name__ == "__main__":
         host="0.0.0.0", 
         assets_dir="assets"
     )
-
