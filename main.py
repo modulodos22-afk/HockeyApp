@@ -1,6 +1,6 @@
 import flet as ft
 import gspread
-from oauth2client.service_account import ServiceAccountCredentials
+from google.oauth2 import service_account
 from datetime import datetime
 import os
 import calendar
@@ -34,14 +34,16 @@ C_TEXTO = "#212121"
 C_GRIS_TXT = "#757575"
 C_ROSITA = "#FFC0CB"
 
-# --- 1. CONEXIÓN ---
+# --- 1. CONEXIÓN (ACTUALIZADA PARA ANDROID) ---
 def conectar_google_sheets():
     scope = ["https://spreadsheets.google.com/feeds", 'https://www.googleapis.com/auth/spreadsheets',
              "https://www.googleapis.com/auth/drive.file", "https://www.googleapis.com/auth/drive"]
-    creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
+    
+    # Usamos la librería google.oauth2 que SÍ funciona en el celular
+    creds = service_account.Credentials.from_service_account_file("credentials.json", scopes=scope)
     client = gspread.authorize(creds)
-    return client.open("HockeyApp_DB") 
-
+    return client.open("HockeyApp_DB")
+    
 def main(page: ft.Page):
     # --- CONFIGURACIÓN DE ASSETS ---
     page.assets_dir = "assets"
@@ -1215,3 +1217,4 @@ if __name__ == "__main__":
         host="0.0.0.0", 
         assets_dir="assets"
     )
+
